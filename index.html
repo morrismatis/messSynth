@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messiaen Mode Drone Synthesizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        /* Define Moog-inspired Retro Color Palette */
+        :root {
+            --color-wood-dark: #3a2b20; /* Darker brown for wood */
+            --color-wood-light: #5c412f; /* Lighter brown for wood grain highlight */
+            --color-faceplate-dark-fallback: #1e1e1e; /* Very dark charcoal/black for fallback */
+            --color-knob-dark: #0a0a0a; /* Pure black for knobs */
+            --color-indicator-light: #f0f0f0; /* Near-white for indicators */
+            --color-text-light: #f5f5f5; /* Light text for values */
+            --color-text-muted: #dcdcdc; /* Slightly muted white for labels */
+            --color-accent-orange: #ff6600; /* Bright orange for active elements/lights */
+            --color-button-border: #cc5200; /* Darker orange for button border */
+            --color-switch-off: #444; /* Color for switch when off */
+            --color-switch-on: var(--color-accent-orange); /* Changed to match play button color */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #333333; /* Darker background to make the synth pop */
+            color: var(--color-text-light); 
+            margin: 0;
+            padding: 1rem; 
+        }
+
+        /* Synth Housing for Wooden Rails */
+        .synth-housing {
+            background-color: var(--color-wood-dark);
+            border-radius: 1rem; 
+            padding: 1.5rem; 
+            box-shadow: 0 15px 30px -8px rgba(0, 0, 0, 0.7), 0 8px 16px -4px rgba(0, 0, 0, 0.5);
+            background-image: url('jGlzr.jpg'); /* Wood grain image */
+            background-size: cover; 
+            background-position: center; 
+            border: 3px solid var(--color-wood-light); 
+            position: relative; 
+            width: 100%; /* Allow housing to expand */
+            max-width: 900px; /* Max width for desktop */
+        }
+
+        .controls-container {
+            /* Main faceplate of the synth - now with brushed metal image */
+            background-color: var(--color-faceplate-dark-fallback); /* Fallback color */
+            background-image: url('faceplate.jpg'); /* Brushed metal faceplate image */
+            background-size: cover; 
+            background-position: center; 
+            background-repeat: no-repeat; 
+            padding: 2rem;
+            border-radius: 0.75rem; 
+            box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.6), inset 0 -1px 3px rgba(255, 255, 255, 0.05);
+            width: 100%; /* Fill housing width */
+            text-align: center;
+            display: grid; 
+            grid-template-columns: repeat(4, 1fr); /* New: 4-column layout for wider screen */
+            gap: 1.5rem 1rem; /* Adjust gap between rows and columns */
+            align-items: start; 
+            border: 1px solid #000; 
+        }
+
+        /* General styling for select and button to fit new aesthetic */
+        select, button {
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out, border-color 0.2s ease-in-out;
+            /* grid-column: span 2;  Removed default spanning for more control below */
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        .hidden {
+            display: none;
+        }
+        .pitch-indicator-container {
+            grid-column: span 4; /* Span all 4 columns */
+            display: flex;
+            justify-content: center; /* Ensure horizontal centering */
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            min-height: 30px; 
+            width: 100%; /* Ensure it takes full width of its grid column */
+        }
+        .pitch-indicator {
+            width: 12px;
+            height: 12px;
+            background-color: #444; 
+            border-radius: 50%;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            transform: scale(0.8);
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.5); 
+        }
+        .pitch-indicator.active {
+            background-color: var(--color-accent-orange); 
+            box-shadow: 0 0 8px var(--color-accent-orange), inset 0 0 4px rgba(255,255,255,0.3); 
+            transform: scale(1.1);
+        }
+
+        /* Knob specific styles */
+        .knob-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            min-width: 100px; 
+        }
+        .knob-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem; 
+            font-weight: 500; 
+            color: var(--color-text-muted); 
+            text-transform: uppercase; 
+            letter-spacing: 0.03em; 
+        }
+        .knob-value {
+            font-size: 1rem;
+            font-weight: bold;
+            color: var(--color-text-light); 
+            margin-top: 0.25rem;
+            min-height: 1.25rem; 
+        }
+        .knob {
+            width: 70px; 
+            height: 70px;
+            background-color: var(--color-knob-dark); 
+            border-radius: 50%;
+            position: relative;
+            cursor: grab;
+            box-shadow: 
+                inset 0 4px 8px rgba(0,0,0,0.8), 
+                inset 0 -2px 4px rgba(255,255,255,0.05), 
+                0 6px 12px rgba(0,0,0,0.7), 
+                0 1px 2px rgba(255,255,255,0.02); 
+            border: 1px solid #000; 
+            overflow: hidden; 
+            background-image: url('http://googleusercontent.com/image_collection/image_retrieval/17299210695836355158'); /* New: Knob texture image */
+            background-size: cover;
+            background-position: center;
+        }
+        .knob::before { /* Metallic center cap */
+            content: '';
+            position: absolute;
+            top: 25%; 
+            left: 25%;
+            width: 50%;
+            height: 50%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 50% 50%, #f0f0f0 0%, #a0a0a0 50%, #606060 100%);
+            box-shadow: inset 0 1px 2px rgba(255,255,255,0.5), inset 0 -1px 2px rgba(0,0,0,0.5);
+        }
+        .knob:active {
+            cursor: grabbing;
+            box-shadow: 
+                inset 0 2px 4px rgba(0,0,0,0.9), 
+                inset 0 -0.5px 1px rgba(255,255,255,0.02),
+                0 3px 6px rgba(0,0,0,0.9);
+        }
+        .knob-indicator {
+            position: absolute;
+            top: 10%; 
+            left: 50%;
+            width: 3px; 
+            height: 40%; 
+            background-color: var(--color-indicator-light); 
+            border-radius: 1.5px; 
+            transform-origin: bottom center;
+            transform: translateX(-50%) rotate(0deg); 
+            transition: transform 0.05s linear; 
+            filter: none; 
+            box-shadow: 0 0 1px rgba(255,255,255,0.7); 
+        }
+
+        /* Specific styling for the Oscillator Type select and inputs */
+        #oscillator-type-select, #base-note-input {
+            background-color: #3a3a3a; 
+            border-color: #1a1a1a; 
+            color: var(--color-text-light); 
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+        #oscillator-type-select {
+            appearance: none; 
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23f5f5f5'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E"); 
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1.5em 1.5em;
+            cursor: pointer;
+        }
+
+        /* Adjustments for main controls-container children to accommodate the grid */
+        .controls-container > div:not(.knob-group, .module-section) { 
+            grid-column: span 2; 
+        }
+        .controls-container > h1, .controls-container > p {
+            grid-column: span 4; 
+        }
+        /* Explicit styling for the main button to ensure background applies */
+        #play-stop-button {
+            grid-column: span 4; /* Span all columns */
+            background-color: var(--color-accent-orange); /* Explicitly set background */
+            color: var(--color-text-light);
+            border: 2px solid var(--color-button-border);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.85rem 1.5rem; 
+            border-radius: 0.5rem; 
+            width: 100%; /* Ensure it fills its grid cell */
+        }
+        #play-stop-button:hover {
+            background-color: #d66f1e;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.5);
+        }
+        
+        /* New module section styling */
+        .module-section {
+            grid-column: span 2; 
+            border: 1px solid #333;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            background-color: rgba(0, 0, 0, 0.2); 
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+        .module-section-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--color-text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Toggle Switch Styling */
+        .toggle-switch-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 10px; 
+        }
+
+        .toggle-switch-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin-bottom: 0.5rem;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--color-switch-off); 
+            transition: .4s;
+            border-radius: 34px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        input:checked + .slider {
+            background-color: var(--color-switch-on); 
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px var(--color-switch-on);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        /* Rounded sliders */
+        .slider.round {
+            border-radius: 34px;
+        }
+
+        .slider.round:before {
+            border-radius: 50%;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="synth-housing">
+        <div class="controls-container">
+            <h1 class="text-3xl font-bold col-span-full mb-4">Messiaen Mode Drone Synth</h1>
+
+            <div class="col-span-full">
+                <label for="mode-select" class="block mb-2 text-sm font-medium" style="color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.03em;">Select Messiaen Mode:</label>
+                <select id="mode-select" class="block w-full p-2.5 rounded-lg text-sm" style="background-color: #3a3a3a; border: 1px solid #1a1a1a; color: var(--color-text-light); box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);">
+                    </select>
+            </div>
+
+            <div class="col-span-full">
+                <label for="base-note-input" class="block mb-2 text-sm font-medium" style="color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.03em;">Base Note (e.g., C3, F#4):</label>
+                <input type="text" id="base-note-input" value="C3" class="block w-full p-2.5 rounded-lg text-sm" style="background-color: #3a3a3a; border: 1px solid #1a1a1a; color: var(--color-text-light); box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);">
+            </div>
+
+            <div class="knob-group">
+                <label class="knob-label">Max Pitches:</label>
+                <div class="knob" id="max-pitches-knob" data-min="1" data-max="8" data-step="1" data-initial="3">
+                    <div class="knob-indicator"></div>
+                </div>
+                <span class="knob-value" id="max-pitches-value">3</span>
+            </div>
+            
+            <div class="knob-group"> 
+                <label class="knob-label">Tempo (BPM):</label>
+                <div class="knob" id="tempo-knob" data-min="30" data-max="180" data-step="1" data-initial="60">
+                    <div class="knob-indicator"></div>
+                </div>
+                <span class="knob-value" id="tempo-value">60</span>
+            </div>
+
+            <div class="knob-group">
+                <label class="knob-label">Silence Prob (%):</label>
+                <div class="knob" id="zero-pitch-probability-knob" data-min="0" data-max="100" data-step="1" data-initial="0">
+                    <div class="knob-indicator"></div>
+                </div>
+                <span class="knob-value" id="zero-pitch-probability-value">0</span>
+            </div>
+
+            <div class="knob-group">
+                <label class="knob-label">Volume (dB):</label>
+                <div class="knob" id="volume-knob" data-min="-30" data-max="0" data-step="1" data-initial="-15">
+                    <div class="knob-indicator"></div>
+                </div>
+                <span class="knob-value" id="volume-value">-15</span>
+            </div>
+
+            <div class="module-section col-span-2">
+                <h2 class="module-section-title">Oscillator</h2>
+                <label for="oscillator-type-select" class="block mb-2 text-sm font-medium" style="color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.03em;">Type:</label>
+                <select id="oscillator-type-select" class="block w-full p-2.5 rounded-lg text-sm" style="background-color: #3a3a3a; border: 1px solid #1a1a1a; color: var(--color-text-light); box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);">
+                    <option value="sine">Sine</option>
+                    <option value="triangle">Triangle</option>
+                    <option value="sawtooth">Sawtooth</option>
+                    <option value="square">Square</option>
+                </select>
+            </div>
+
+
+            <div class="module-section">
+                <h2 class="module-section-title">Filter</h2>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <div class="knob-group">
+                        <label class="knob-label">LPF Cutoff:</label>
+                        <div class="knob" id="lpf-cutoff-knob" data-min="100" data-max="20000" data-step="100" data-initial="20000">
+                            <div class="knob-indicator"></div>
+                        </div>
+                        <span class="knob-value" id="lpf-cutoff-value">20000</span>
+                    </div>
+                    <div class="knob-group">
+                        <label class="knob-label">Resonance (Q):</label>
+                        <div class="knob" id="resonance-knob" data-min="0.1" data-max="20" data-step="0.1" data-initial="1">
+                            <div class="knob-indicator"></div>
+                        </div>
+                        <span class="knob-value" id="resonance-value">1.0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="module-section">
+                <h2 class="module-section-title">Ring Modulator</h2>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <div class="knob-group">
+                        <label class="knob-label">Frequency (Hz):</label>
+                        <div class="knob" id="ring-mod-freq-knob" data-min="0" data-max="1000" data-step="1" data-initial="0">
+                            <div class="knob-indicator"></div>
+                        </div>
+                        <span class="knob-value" id="ring-mod-freq-value">0</span>
+                    </div>
+                    <div class="toggle-switch-container">
+                        <label class="toggle-switch-label">On/Off</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="ring-mod-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="module-section">
+                <h2 class="module-section-title">Envelope</h2>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <div class="knob-group">
+                        <label class="knob-label">Attack (s):</label>
+                        <div class="knob" id="attack-knob" data-min="0.1" data-max="10" data-step="0.1" data-initial="3">
+                            <div class="knob-indicator"></div>
+                        </div>
+                        <span class="knob-value" id="attack-value">3.0</span>
+                    </div>
+                    <div class="knob-group">
+                        <label class="knob-label">Release (s):</label>
+                        <div class="knob" id="release-knob" data-min="0.1" data-max="10" data-step="0.1" data-initial="3">
+                            <div class="knob-indicator"></div>
+                        </div>
+                        <span class="knob-value" id="release-value">3.0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="module-section">
+                <h2 class="module-section-title">Reverb</h2>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <div class="knob-group">
+                        <label class="knob-label">Size (s):</label>
+                        <div class="knob" id="reverb-size-knob" data-min="0.5" data-max="60" data-step="0.1" data-initial="5">
+                            <div class="knob-indicator"></div>
+                        </div>
+                        <span class="knob-value" id="reverb-size-value">5.0</span>
+                    </div>
+                    <div class="knob-group">
+                        <label class="knob-label">Wetness (%):</label>
+                        <div class="knob" id="reverb-wet-knob" data-min="0" data-max="100" data-step="1" data-initial="30">
+                            <div class="knob-indicator"></div>
+                        </div>
+                        <span class="knob-value" id="reverb-wet-value">30</span>
+                    </div>
+                </div>
+            </div>
+
+
+            <button id="play-stop-button" class="col-span-full">
+                Play Drone
+            </button>
+
+            <div id="pitch-indicator-container" class="pitch-indicator-container">
+                </div>
+
+            <p id="status-text" class="text-sm h-10 flex items-center justify-center col-span-full" style="color: var(--color-text-muted);">Status: Idle. Click Play to start.</p>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- Configuration ---
+        const MESSIAEN_MODES = [
+            { name: "Mode 1 (Whole Tone)", intervals: [2, 2, 2, 2, 2, 2] },
+            { name: "Mode 2 (Octatonic H-W)", intervals: [1, 2, 1, 2, 1, 2, 1, 2] },
+            { name: "Mode 3", intervals: [2, 1, 1, 2, 1, 1, 2, 1, 1] },
+            { name: "Mode 4", intervals: [1, 1, 3, 1, 1, 1, 3, 1] },
+            { name: "Mode 5", intervals: [1, 4, 1, 1, 4, 1] },
+            { name: "Mode 6", intervals: [2, 2, 1, 1, 2, 2, 1, 1] },
+            { name: "Mode 7", intervals: [1, 1, 1, 2, 1, 1, 1, 1, 2, 1] }
+        ];
+
+        // --- Audio Elements (Tone.js) ---
+        let synth;
+        let reverb;
+        let lpfFilter; 
+        let ringModulator; 
+        let isPlaying = false;
+        let isToneStarted = false;
+        let randomizationTimerId = null;
+        let currentPlayingFrequencies = []; 
+
+        // --- UI Elements ---
+        const modeSelect = document.getElementById('mode-select');
+        const baseNoteInput = document.getElementById('base-note-input');
+        const playStopButton = document.getElementById('play-stop-button');
+        const statusText = document.getElementById('status-text');
+        const oscillatorTypeSelect = document.getElementById('oscillator-type-select');
+        const pitchIndicatorContainer = document.getElementById('pitch-indicator-container');
+
+        // Knob elements
+        const maxPitchesKnob = document.getElementById('max-pitches-knob');
+        const maxPitchesValueDisplay = document.getElementById('max-pitches-value');
+        const tempoKnob = document.getElementById('tempo-knob');
+        const tempoValueDisplay = document.getElementById('tempo-value');
+        const zeroPitchProbabilityKnob = document.getElementById('zero-pitch-probability-knob');
+        const zeroPitchProbabilityValueDisplay = document.getElementById('zero-pitch-probability-value');
+        const volumeKnob = document.getElementById('volume-knob');
+        const volumeValueDisplay = document.getElementById('volume-value');
+        const attackKnob = document.getElementById('attack-knob');
+        const attackValueDisplay = document.getElementById('attack-value');
+        const releaseKnob = document.getElementById('release-knob');
+        const releaseValueDisplay = document.getElementById('release-value');
+        const reverbSizeKnob = document.getElementById('reverb-size-knob');
+        const reverbSizeValueDisplay = document.getElementById('reverb-size-value');
+        const reverbWetKnob = document.getElementById('reverb-wet-knob');
+        const reverbWetValueDisplay = document.getElementById('reverb-wet-value');
+
+        // Filter Elements
+        const lpfCutoffKnob = document.getElementById('lpf-cutoff-knob');
+        const lpfCutoffValueDisplay = document.getElementById('lpf-cutoff-value');
+        const resonanceKnob = document.getElementById('resonance-knob');
+        const resonanceValueDisplay = document.getElementById('resonance-value');
+
+        // Ring Modulator Elements
+        const ringModFreqKnob = document.getElementById('ring-mod-freq-knob');
+        const ringModFreqValueDisplay = document.getElementById('ring-mod-freq-value');
+        const ringModToggle = document.getElementById('ring-mod-toggle');
+
+
+        // --- Knob Control Functionality ---
+        /**
+         * Creates and manages a draggable knob UI component.
+         * @param {HTMLElement} knobElement - The main knob div element.
+         * @param {HTMLElement} valueDisplayElement - The span element to display the current value.
+         * @param {number} min - The minimum value for the knob.
+         * @param {number} max - The maximum value for the knob.
+         * @param {number} step - The increment/decrement step for the knob value.
+         * @param {number} initialValue - The initial value of the knob.
+         * @param {function} onChangeCallback - Callback function triggered when the value changes.
+         */
+        function createKnob(knobElement, valueDisplayElement, min, max, step, initialValue, onChangeCallback) {
+            let currentValue = initialValue;
+            let startY = 0;
+            let startValue = 0;
+            let isDragging = false;
+            const indicator = knobElement.querySelector('.knob-indicator');
+
+            // Map value to rotation (e.g., -135deg to 135deg for a 270-degree range)
+            const minRotation = -135; // degrees
+            const maxRotation = 135;  // degrees
+            const rotationRange = maxRotation - minRotation;
+            const range = max - min;
+
+
+            function updateKnobRotation() {
+                const normalizedValue = (currentValue - min) / range;
+                const rotation = minRotation + (normalizedValue * rotationRange);
+                indicator.style.transform = `translateX(-50%) rotate(${rotation}deg)`;
+                // Format value based on step to avoid excessive decimals for integer steps
+                if (step < 1 && step > 0) { // For values like 0.1, 0.01 etc.
+                    const decimalPlaces = step.toString().split('.')[1]?.length || 0;
+                    valueDisplayElement.textContent = currentValue.toFixed(decimalPlaces);
+                } else {
+                    valueDisplayElement.textContent = currentValue.toFixed(0);
+                }
+            }
+
+            function handleMouseMove(e) {
+                if (!isDragging) return;
+                const clientY = e.clientY || e.touches[0].clientY;
+                const deltaY = clientY - startY;
+                
+                // Sensitivity: smaller multiplier for finer control
+                const sensitivity = 0.5; 
+                let newValue = startValue - (deltaY * step * sensitivity);
+
+                // Snap to step
+                newValue = Math.round(newValue / step) * step;
+
+                // Clamp value within min/max
+                newValue = Math.max(min, Math.min(max, newValue));
+
+                if (newValue !== currentValue) {
+                    currentValue = newValue;
+                    updateKnobRotation();
+                    onChangeCallback(currentValue);
+                }
+            }
+
+            function handleMouseUp() {
+                isDragging = false;
+                knobElement.classList.remove('active');
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+                document.removeEventListener('touchmove', handleMouseMove);
+                document.removeEventListener('touchend', handleMouseUp);
+            }
+
+            function handleMouseDown(e) {
+                isDragging = true;
+                knobElement.classList.add('active');
+                startY = e.clientY || e.touches[0].clientY;
+                startValue = currentValue;
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+                document.addEventListener('touchmove', handleMouseMove);
+                document.addEventListener('touchend', handleMouseUp);
+                e.preventDefault(); // Prevent text selection or other default browser behaviors
+            }
+
+            knobElement.addEventListener('mousedown', handleMouseDown);
+            knobElement.addEventListener('touchstart', handleMouseDown);
+
+            // Set initial state
+            updateKnobRotation();
+
+            // Expose a method to set value programmatically if needed
+            knobElement.setValue = (newValue) => {
+                currentValue = Math.max(min, Math.min(max, newValue));
+                updateKnobRotation();
+                onChangeCallback(currentValue);
+            };
+
+            // Expose a method to get current value
+            knobElement.getValue = () => currentValue;
+        }
+
+
+        // --- Helper Functions ---
+
+        /**
+         * Converts a note name string (e.g., "C3", "F#4") to a MIDI note number.
+         * Returns null if the note name is invalid.
+         * @param {string} noteName - The note name.
+         * @returns {number|null} MIDI note number or null.
+         */
+        function noteNameToMidi(noteName) {
+            try {
+                return Tone.Frequency(noteName).toMidi();
+            } catch (e) {
+                console.error(`Invalid note name: ${noteName}`, e);
+                return null;
+            }
+        }
+        
+        /**
+         * Generates a sequence of MIDI notes based on a base note and mode intervals.
+         * @param {number} baseMidi - The starting MIDI note.
+         * @param {number[]} modeIntervals - Array of semitone intervals for the mode.
+         * @param {number} count - How many notes to generate in the sequence (typically 12-24 for a good spread).
+         * @returns {number[]} An array of MIDI note numbers.
+         */
+        function generateModeNoteSequence(baseMidi, modeIntervals, count = 24) {
+            const sequence = [baseMidi];
+            let currentMidi = baseMidi;
+            for (let i = 0; i < count - 1; i++) {
+                const interval = modeIntervals[i % modeIntervals.length];
+                currentMidi += interval;
+                sequence.push(currentMidi);
+            }
+            return sequence;
+        }
+
+        /**
+         * Calculates the frequencies for the drone based on current UI settings.
+         * Incorporates zero pitch probability and random number of pitches up to max.
+         * @returns {number[]} An array of frequencies for the drone voices, or empty if error or silence.
+         */
+        function calculateDroneFrequencies() {
+            const selectedModeIndex = parseInt(modeSelect.value);
+            const baseNoteValue = baseNoteInput.value.trim();
+            const maxPitches = maxPitchesKnob.getValue(); 
+            const zeroPitchProb = zeroPitchProbabilityKnob.getValue() / 100; 
+
+            // First, check for overall silence probability
+            if (Math.random() < zeroPitchProb) {
+                return []; 
+            }
+
+            if (isNaN(selectedModeIndex) || selectedModeIndex < 0 || selectedModeIndex >= MESSIAEN_MODES.length) {
+                statusText.textContent = "Error: Invalid mode selected.";
+                return [];
+            }
+            const baseMidi = noteNameToMidi(baseNoteValue);
+            if (baseMidi === null) {
+                statusText.textContent = `Error: Invalid base note "${baseNoteValue}". Use format like C3, F#4.`;
+                return [];
+            }
+            if (isNaN(maxPitches) || maxPitches < 1 || maxPitches > 8) {
+                statusText.textContent = "Error: Max pitches must be between 1 and 8.";
+                return [];
+            }
+
+            const selectedMode = MESSIAEN_MODES[selectedModeIndex];
+            const fullModeSequence = generateModeNoteSequence(baseMidi, selectedMode.intervals);
+            
+            // Determine the actual number of pitches for this randomization (0 to maxPitches)
+            const actualPitches = Math.floor(Math.random() * (maxPitches + 1)); 
+
+            if (actualPitches === 0) {
+                return []; 
+            }
+
+            // Randomly select actualPitches unique notes from the mode sequence
+            const shuffled = [...fullModeSequence].sort(() => 0.5 - Math.random());
+            let droneMidiNotes = shuffled.slice(0, Math.min(actualPitches, shuffled.length));
+            
+            // Ensure we have enough notes, pad if necessary (e.g. if mode is very short)
+            while(droneMidiNotes.length < actualPitches && droneMidiNotes.length > 0) {
+                droneMidiNotes.push(droneMidiNotes[droneMidiNotes.length - 1]); 
+            }
+            if(droneMidiNotes.length === 0 && actualPitches > 0) { 
+                 droneMidiNotes.push(baseMidi); 
+            }
+
+            return droneMidiNotes.map(midi => Tone.Frequency(midi, "midi").toFrequency());
+        }
+
+        /**
+         * Updates the visual pitch indicators based on the currently playing frequencies.
+         * @param {number[]} frequencies - An array of frequencies currently playing.
+         */
+        function updatePitchIndicators(frequencies) {
+            pitchIndicatorContainer.innerHTML = ''; 
+            const maxPitches = maxPitchesKnob.getValue(); 
+
+            // If frequencies is empty (silence), show no active indicators
+            if (frequencies.length === 0) {
+                for (let i = 0; i < maxPitches; i++) { 
+                    const indicator = document.createElement('div');
+                    indicator.classList.add('pitch-indicator');
+                    pitchIndicatorContainer.appendChild(indicator);
+                }
+                return;
+            }
+
+            // Create indicators for the maximum possible pitches
+            for (let i = 0; i < maxPitches; i++) {
+                const indicator = document.createElement('div');
+                indicator.classList.add('pitch-indicator');
+                // Only mark active if there's a corresponding playing frequency
+                if (i < frequencies.length) {
+                    indicator.classList.add('active');
+                }
+                pitchIndicatorContainer.appendChild(indicator);
+            }
+        }
+
+        // --- Audio Control Functions ---
+
+        /**
+         * Initializes or re-initializes the Tone.js PolySynth and Effects based on UI settings.
+         */
+        function initializeOrUpdateSynth() {
+            const maxPitches = maxPitchesKnob.getValue(); 
+            const oscillatorType = oscillatorTypeSelect.value;
+            const attack = attackKnob.getValue(); 
+            const release = releaseKnob.getValue(); 
+            const volume = volumeKnob.getValue(); 
+            const reverbSize = reverbSizeKnob.getValue(); 
+            const reverbWet = reverbWetKnob.getValue() / 100; 
+
+            // Filter settings
+            const lpfCutoff = lpfCutoffKnob.getValue();
+            const resonance = resonanceKnob.getValue();
+
+            // Ring Modulator settings
+            const ringModFreq = ringModFreqKnob.getValue();
+            const ringModActive = ringModToggle.checked;
+
+            // Dispose existing synth and effects if they exist
+            if (synth) synth.dispose();
+            if (reverb) reverb.dispose();
+            if (lpfFilter) lpfFilter.dispose();
+            if (ringModulator) ringModulator.dispose();
+
+            // Create new synth
+            synth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: oscillatorType },
+                envelope: {
+                    attack: attack,
+                    decay: 0.1, 
+                    sustain: 1.0, 
+                    release: release
+                },
+                volume: volume 
+            });
+
+            // Create LPF Filter
+            lpfFilter = new Tone.Filter(lpfCutoff, "lowpass", -24); // -24dB/oct slope for a more analog feel
+            lpfFilter.Q.value = resonance;
+
+            // Create Ring Modulator (using FrequencyShifter for the effect)
+            ringModulator = new Tone.FrequencyShifter(ringModFreq);
+            // Control ring modulator bypass using its wet property
+            ringModulator.wet.value = ringModActive ? 1 : 0;
+
+
+            // Create new reverb
+            reverb = new Tone.Reverb({
+                decay: reverbSize, 
+                preDelay: Math.min(reverbSize * 0.02, 0.5), 
+                wet: reverbWet
+            });
+
+            // Connect the chain: Synth -> LPF -> Ring Mod -> Reverb -> Destination
+            synth.chain(lpfFilter, ringModulator, reverb, Tone.Destination);
+
+            synth.maxPolyphony = maxPitches; 
+        }
+
+        /**
+         * Starts the randomization timer.
+         */
+        function startRandomizationTimer() {
+            if (randomizationTimerId) clearInterval(randomizationTimerId); 
+
+            if (isPlaying) { 
+                const bpm = tempoKnob.getValue(); 
+                const intervalMs = (60 / bpm) * 4 * 1000; 
+                const overlapMs = 200; 
+
+                randomizationTimerId = setInterval(() => {
+                    if (isPlaying) { 
+                        console.log("Randomizing pitches...");
+                        const oldFrequencies = [...currentPlayingFrequencies]; 
+                        const newFrequencies = calculateDroneFrequencies();
+
+                        if (newFrequencies.length > 0) { 
+                            if (synth) {
+                                synth.triggerAttack(newFrequencies); 
+                                currentPlayingFrequencies = newFrequencies; 
+                                updatePitchIndicators(currentPlayingFrequencies); 
+                                statusText.textContent = `Playing: ${MESSIAEN_MODES[parseInt(modeSelect.value)].name} (Randomized)`;
+
+                                if (oldFrequencies.length > 0) {
+                                    setTimeout(() => {
+                                        if (isPlaying && synth) { 
+                                            synth.triggerRelease(oldFrequencies);
+                                        }
+                                    }, overlapMs); 
+                                }
+                            }
+                        } else { 
+                            if (synth && oldFrequencies.length > 0) {
+                                synth.releaseAll(); 
+                            }
+                            currentPlayingFrequencies = []; 
+                            updatePitchIndicators(currentPlayingFrequencies); 
+                            statusText.textContent = `Playing: ${MESSIAEN_MODES[parseInt(modeSelect.value)].name} (Silence)`;
+                        }
+                    }
+                }, intervalMs);
+            }
+        }
+
+        /**
+         * Stops the randomization timer.
+         */
+        function stopRandomizationTimer() {
+            if (randomizationTimerId) {
+                clearInterval(randomizationTimerId);
+                randomizationTimerId = null;
+            }
+        }
+
+        /**
+         * Starts playing the drone.
+         */
+        async function startDrone() {
+            if (!isToneStarted) {
+                try {
+                    await Tone.start();
+                    isToneStarted = true;
+                    console.log("AudioContext started successfully.");
+                } catch (e) {
+                    console.error("Error starting Tone.js AudioContext:", e);
+                    statusText.textContent = "Error: Could not start audio. Please ensure browser permissions.";
+                    return;
+                }
+            }
+
+            initializeOrUpdateSynth(); 
+
+            const frequencies = calculateDroneFrequencies();
+            
+            try {
+                if (frequencies.length > 0) {
+                    synth.triggerAttack(frequencies);
+                } else {
+                    synth.releaseAll();
+                }
+                isPlaying = true;
+                currentPlayingFrequencies = frequencies; 
+                updatePitchIndicators(currentPlayingFrequencies); 
+                playStopButton.textContent = "Stop Drone";
+                const selectedModeName = MESSIAEN_MODES[parseInt(modeSelect.value)].name;
+                statusText.textContent = `Playing: ${selectedModeName}${frequencies.length === 0 ? ' (Silence)' : ' (Randomized)'}`;
+                
+                startRandomizationTimer(); 
+                
+            } catch (e) {
+                console.error("Error triggering synth attack:", e);
+                statusText.textContent = "Error playing sound. Synth might not be ready.";
+                initializeOrUpdateSynth(); 
+            }
+        }
+
+        /**
+         * Stops playing the drone.
+         */
+        function stopDrone() {
+            stopRandomizationTimer(); 
+            if (synth && isPlaying) {
+                synth.releaseAll();
+            }
+            isPlaying = false;
+            currentPlayingFrequencies = []; 
+            updatePitchIndicators(currentPlayingFrequencies); 
+            playStopButton.textContent = "Play Drone";
+            statusText.textContent = "Status: Stopped";
+        }
+
+        /**
+         * Handles changes to any control that should update the drone if it's playing.
+         */
+        function handleControlChange() {
+            if (isPlaying) {
+                stopDrone();
+                setTimeout(startDrone, 150); 
+            } else {
+                const selectedModeName = MESSIAEN_MODES[parseInt(modeSelect.value)].name;
+                const baseNoteValue = baseNoteInput.value;
+                const maxPitches = maxPitchesKnob.getValue(); 
+                statusText.textContent = `Ready: ${selectedModeName}, Base ${baseNoteValue}, Max ${maxPitches} pitches. Click Play.`;
+                updatePitchIndicators(calculateDroneFrequencies());
+            }
+        }
+
+        // --- Event Listeners ---
+        
+        function populateModeSelector() {
+            MESSIAEN_MODES.forEach((mode, index) => {
+                const option = document.createElement('option');
+                option.value = index.toString();
+                option.textContent = mode.name;
+                modeSelect.appendChild(option);
+            });
+        }
+
+        playStopButton.addEventListener('click', () => {
+            if (isPlaying) {
+                stopDrone();
+            } else {
+                startDrone();
+            }
+        });
+
+        modeSelect.addEventListener('change', handleControlChange);
+        baseNoteInput.addEventListener('change', handleControlChange);
+        oscillatorTypeSelect.addEventListener('change', handleControlChange);
+
+        // Initialize all main knobs
+        createKnob(maxPitchesKnob, maxPitchesValueDisplay, 
+            parseFloat(maxPitchesKnob.dataset.min), 
+            parseFloat(maxPitchesKnob.dataset.max), 
+            parseFloat(maxPitchesKnob.dataset.step), 
+            parseFloat(maxPitchesKnob.dataset.initial), 
+            handleControlChange);
+
+        createKnob(tempoKnob, tempoValueDisplay, 
+            parseFloat(tempoKnob.dataset.min), 
+            parseFloat(tempoKnob.dataset.max), 
+            parseFloat(tempoKnob.dataset.step), 
+            parseFloat(tempoKnob.dataset.initial), 
+            startRandomizationTimer); 
+
+        createKnob(zeroPitchProbabilityKnob, zeroPitchProbabilityValueDisplay, 
+            parseFloat(zeroPitchProbabilityKnob.dataset.min), 
+            parseFloat(zeroPitchProbabilityKnob.dataset.max), 
+            parseFloat(zeroPitchProbabilityKnob.dataset.step), 
+            parseFloat(zeroPitchProbabilityKnob.dataset.initial), 
+            () => { /* No direct action, next interval will pick up new value */ });
+
+        createKnob(volumeKnob, volumeValueDisplay, 
+            parseFloat(volumeKnob.dataset.min), 
+            parseFloat(volumeKnob.dataset.max), 
+            parseFloat(volumeKnob.dataset.step), 
+            parseFloat(volumeKnob.dataset.initial), 
+            (value) => { if (synth) synth.volume.value = value; });
+
+        createKnob(attackKnob, attackValueDisplay, 
+            parseFloat(attackKnob.dataset.min), 
+            parseFloat(attackKnob.dataset.max), 
+            parseFloat(attackKnob.dataset.step), 
+            parseFloat(attackKnob.dataset.initial), 
+            handleControlChange);
+
+        createKnob(releaseKnob, releaseValueDisplay, 
+            parseFloat(releaseKnob.dataset.min), 
+            parseFloat(releaseKnob.dataset.max), 
+            parseFloat(releaseKnob.dataset.step), 
+            parseFloat(releaseKnob.dataset.initial), 
+            handleControlChange);
+
+        createKnob(reverbSizeKnob, reverbSizeValueDisplay, 
+            parseFloat(reverbSizeKnob.dataset.min), 
+            parseFloat(reverbSizeKnob.dataset.max), 
+            parseFloat(reverbSizeKnob.dataset.step), 
+            parseFloat(reverbSizeKnob.dataset.initial), 
+            (value) => { 
+                if (reverb) { 
+                    reverb.decay = value; 
+                    reverb.preDelay = Math.min(value * 0.02, 0.5); 
+                } 
+            });
+
+        createKnob(reverbWetKnob, reverbWetValueDisplay, 
+            parseFloat(reverbWetKnob.dataset.min), 
+            parseFloat(reverbWetKnob.dataset.max), 
+            parseFloat(reverbWetKnob.dataset.step), 
+            parseFloat(reverbWetKnob.dataset.initial), 
+            (value) => { if (reverb) reverb.wet.value = value / 100; });
+
+
+        // Initialize new Filter knobs
+        createKnob(lpfCutoffKnob, lpfCutoffValueDisplay,
+            parseFloat(lpfCutoffKnob.dataset.min),
+            parseFloat(lpfCutoffKnob.dataset.max),
+            parseFloat(lpfCutoffKnob.dataset.step),
+            parseFloat(lpfCutoffKnob.dataset.initial),
+            (value) => { if (lpfFilter) lpfFilter.frequency.value = value; });
+
+        createKnob(resonanceKnob, resonanceValueDisplay,
+            parseFloat(resonanceKnob.dataset.min),
+            parseFloat(resonanceKnob.dataset.max),
+            parseFloat(resonanceKnob.dataset.step),
+            parseFloat(resonanceKnob.dataset.initial),
+            (value) => { if (lpfFilter) lpfFilter.Q.value = value; });
+
+        // Initialize new Ring Modulator knob and toggle
+        createKnob(ringModFreqKnob, ringModFreqValueDisplay,
+            parseFloat(ringModFreqKnob.dataset.min),
+            parseFloat(ringModFreqKnob.dataset.max),
+            parseFloat(ringModFreqKnob.dataset.step),
+            parseFloat(ringModFreqKnob.dataset.initial),
+            (value) => { if (ringModulator) ringModulator.frequency.value = value; });
+        
+        // Use an anonymous function to handle the toggle change
+        ringModToggle.addEventListener('change', () => {
+            if (ringModulator) {
+                ringModulator.wet.value = ringModToggle.checked ? 1 : 0;
+            }
+            // If playing, re-calculate and update status to reflect ring mod state
+            if (isPlaying) {
+                const selectedModeName = MESSIAEN_MODES[parseInt(modeSelect.value)].name;
+                statusText.textContent = `Playing: ${selectedModeName}${ringModToggle.checked ? ' (Ring Mod ON)' : ' (Ring Mod OFF)'}`;
+            }
+        });
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            populateModeSelector();
+            initializeOrUpdateSynth(); 
+            const initialModeName = MESSIAEN_MODES[0].name;
+            const maxPitches = maxPitchesKnob.getValue(); 
+            statusText.textContent = `Selected: ${initialModeName}, Base ${baseNoteInput.value}, Max ${maxPitches} pitches. Click Play.`;
+            updatePitchIndicators(calculateDroneFrequencies()); 
+        });
+
+    </script>
+</body>
+</html>
